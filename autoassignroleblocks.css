@@ -1,0 +1,8 @@
+/* $Id$  */
+/* 
+  Document : autoassignroleblocks
+  Description:
+    do some block styling for form elements inserted with autoassignrole blocks.
+*/
+
+.block-autoassignroleblocks input{max-width:96%;}

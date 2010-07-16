@@ -1,0 +1,5 @@
+; $Id$
+name = "Auto Assign Role Blocks"
+description = "Creates block registration forms for specified roles when using 'Auto Assign Role' for registration."
+core = 6.x
+dependencies[] = autoassignrole

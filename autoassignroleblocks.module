@@ -1,0 +1,216 @@
+<?php
+// $Id$
+/**
+ * @file
+ * Main module file, creates blocks and preferences for the autoassignrole
+ * config.
+ */
+
+/**
+ * Implementation of hook_init().
+ * @return
+ *   None.
+ */
+function autoassignroleblocks_init() {
+  $path = drupal_get_path('module', 'autoassignroleblocks');
+  drupal_add_css($path . '/autoassignroleblocks.css');
+}
+
+/**
+ * Implementation of hook_form_FORM_ID_alter().
+ * Add in additional block options into the autoassignrole settings page
+ * 
+ * @param $form
+ *   Nested array of form elements that comprise the form.
+ * @param $form_state
+ *   A keyed array containing the current state of the form.
+ *
+ * @return
+ *   None.
+ */
+function autoassignroleblocks_form_autoassignrole_admin_form_alter(&$form, $form_state) {
+  $roles = user_roles(TRUE);
+  unset($roles[DRUPAL_AUTHENTICATED_RID]);
+  $form['autoassignrole_settings_blocks'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Auto Assign Role Blocks'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE,
+  );
+  foreach ($roles as $k => $v) {
+    if ($form['autoassignrole_settings_page'][$k]["path_active_$k"]['#default_value'] != 1)
+      unset($roles[$k]);
+  }
+  $form['autoassignrole_settings_blocks']['auto_roles_blocks'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Check the roles for which you would like a block to be enabled'),
+    '#description' => t('Note: only roles that currently have a status of enabled under "%s" will be available here.', array('%s' => t('Assign from Path'))),
+    '#default_value' => variable_get('autoassignroleblocks_roles', array()),
+    '#options' => $roles,
+  );
+  // elements displaying in wrong order so force submit to show at bottom
+  $form['submit']['#weight'] = 100;
+  // add our own submit function so we can save these values
+  $form['#submit'][] = 'autoassignroleblocks_form_autoassignrole_admin_form_submit';
+}
+
+/**
+ * Custom submit function called from above hook_form_FORM_ID_alter().
+ * Simply do a variable_set manually for this settings form since autoassignrole
+ * module does it's own settings saving.
+ *
+ * @param $form_id
+ *   A valid form id.
+ * @param $form_state
+ *   A keyed array containing the current state of the form.
+ * 
+ * @return
+ *   None.
+ * 
+ * @see autoassignroleblocks_form_autoassignrole_admin_form_alter().
+ */
+function autoassignroleblocks_form_autoassignrole_admin_form_submit($form_id, &$form_state) {
+  variable_set('autoassignroleblocks_roles', $form_state['values']['auto_roles_blocks']);
+}
+
+/**
+ * Utility function to get rid of descriptions in form.
+ *
+ * @param $form
+ *   Nested array of form elements that comprise the form.
+ * @param $path
+ *   A valid path that is going to be used for the action on this form.
+ *
+ * @return $form
+ *   The altered nested array of form elements that comprise the form.
+ *
+ * @todo maybe make this configurable per block?
+ */
+function autoassignroleblocks_user_registration_formalterations($form, $path) {
+  foreach ($form as $elem => $val) {
+    // get rid of descriptions which are problematic for layout in a block
+    if (isset($form[$elem]['#description'])) unset($form[$elem]['#description']);
+  }
+  // set the form action manually
+  $form['#action'] = base_path() . $path;
+  return $form;
+}
+
+/**
+ * Copy of the drupal function drupal_get_form().
+ * Retrieves a form from a constructor function, or from the cache if
+ * the form was built in a previous page-load. The form is then passed
+ * on for processing, after and rendered for display if necessary.
+ *   - This was done so we can do additional processing within it.
+ *
+ * @param $form_id
+ *   The unique string identifying the desired form. If a function
+ *   with that name exists, it is called to build the form array.
+ *   Modules that need to generate the same form (or very similar forms)
+ *   using different $form_ids can implement hook_forms(), which maps
+ *   different $form_id values to the proper form constructor function. Examples
+ *   may be found in node_forms(), search_forms(), and user_forms().
+ * @param ...
+ *   Any additional arguments are passed on to the functions called by
+ *   drupal_get_form(), including the unique form constructor function.
+ *   For example, the node_edit form requires that a node object be passed
+ *   in here when it is called.
+ *
+ * @return
+ *   The rendered form.
+ * 
+ * @see drupal_get_form().
+ */
+function autoassignroleblocks_drupal_get_form($form_id, &$form) {
+  $form_state = array('storage' => NULL, 'submitted' => FALSE);
+  $args = func_get_args();
+  $cacheable = FALSE;
+  if (isset($_SESSION['batch_form_state'])) {
+    $form_state = $_SESSION['batch_form_state'];
+    unset($_SESSION['batch_form_state']);
+  }
+  else {
+    if (isset($_POST['form_id']) && $_POST['form_id'] == $form_id && !empty($_POST['form_build_id'])) {
+      $form = form_get_cache($_POST['form_build_id'], $form_state);
+    }
+    if (!isset($form)) {
+      $form_state['post'] = $_POST;
+      $args_temp = $args;
+      $args_temp[0] = &$form_state;
+      array_unshift($args_temp, $form_id);
+      $form = call_user_func_array('drupal_retrieve_form', $args_temp);
+      $form_build_id = 'form-'. md5(uniqid(mt_rand(), TRUE));
+      $form['#build_id'] = $form_build_id;
+      drupal_prepare_form($form_id, $form, $form_state);
+      $original_form = $form;
+      $cacheable = TRUE;
+      unset($form_state['post']);
+    }
+    $form['#post'] = $_POST;
+    drupal_process_form($form_id, $form, $form_state);
+    if ($cacheable && !empty($form['#cache'])) {
+      form_set_cache($form_build_id, $original_form, $form_state);
+    }
+  }
+  if ((!empty($form_state['storage']) || !empty($form_state['rebuild'])) && !empty($form_state['process_input']) && !form_get_errors()) {
+    $form = drupal_rebuild_form($form_id, $form_state, $args);
+  }
+  // call our custom utility function to do some alterations on this form
+  $form = autoassignroleblocks_user_registration_formalterations($form, $args[1]);
+  // set ID of form based on delta of block to avoid conflicts
+  $form['form_id']['#id'] = $form['form_id']['#id'] . '_' . $args[2];
+  return drupal_render_form($form_id, $form);
+}
+
+/**
+ * Implementation of hook_block().
+ * Creates a block for each of the enabled roles that are set to have a block.
+ *
+ * @global $user
+ * @param $op
+ *   What kind of information to retrieve about the block or blocks.
+ * @param $delta
+ *   Which block to return
+ * @param $edit
+ *   If $op is 'save', the submitted form data from the configuration form.
+ *
+ * @return ...
+ *   - If $op is 'list': An array of block descriptions.
+ *   - If $op is 'view': return an array which must define a 'subject' element
+ *     and a 'content' element defining the block indexed by $delta.
+ */
+function autoassignroleblocks_block($op = 'list', $delta = 0, $edit = array()) {
+  switch ($op) {
+    case 'list':
+      $blocks = array();
+      $i = 0;
+      $roles = user_roles(TRUE); // array of all available roles to get the name of the role
+      $enabled_blocks = variable_get('autoassignroleblocks_roles', array());
+      // create a block for each enabled auto assign role block
+      foreach ($enabled_blocks as $v) {
+        if ($v !== 0) {
+          $title = $roles[$v]; // role name
+          $blocks[$v]['info'] = t('Auto Assign Role Block - @title', array('@title' =>  $title));
+          $i++;
+        }
+      }
+      return $blocks;
+      break;
+    case 'view':
+      global $user;
+      if ($user->uid == 0) { // only do this for anonymous users
+        $get = $_GET['q']; // store the get variable so we can reset it later
+        // get our data for this block from the database
+        $row = db_fetch_array(db_query("SELECT path, registration, display FROM {autoassignrole_page} WHERE rid = %d LIMIT 1", $delta));
+        // extract the row to variables, we get $path, $registration, $display
+        extract($row, EXTR_OVERWRITE);
+        // tempoorarily change $_GET['q'] to the path of the autoassignrole_page we are working with
+        $_GET['q'] = ($registration == '1') ? $path : ($display == 1) ? 'user/' . $path : $path . '/register';
+        $block['content'] = autoassignroleblocks_drupal_get_form('user_register', $_GET['q'], $delta);
+        // change $_GET['q'] back to it's original value
+        $_GET['q'] = $get;
+      }
+      return $block;
+    break;
+  }
+}
