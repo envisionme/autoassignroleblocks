@@ -1,5 +1,4 @@
 <?php
-// $Id$
 /**
  * @file
  * Main module file, creates blocks and preferences for the autoassignrole
