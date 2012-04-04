@@ -120,7 +120,7 @@ function autoassignroleblocks_user_registration_formalterations($form, $path) {
  * 
  * @see drupal_get_form().
  */
-function autoassignroleblocks_drupal_get_form($form_id, &$form) {
+function autoassignroleblocks_drupal_get_form($form_id) {
   $form_state = array('storage' => NULL, 'submitted' => FALSE);
   $args = func_get_args();
   $cacheable = FALSE;
@@ -138,6 +138,8 @@ function autoassignroleblocks_drupal_get_form($form_id, &$form) {
       $args_temp[0] = &$form_state;
       array_unshift($args_temp, $form_id);
       $form = call_user_func_array('drupal_retrieve_form', $args_temp);
+      // call our custom utility function to do some alterations on this form
+      $form = autoassignroleblocks_user_registration_formalterations($form, $args[1]);
       $form_build_id = 'form-'. md5(uniqid(mt_rand(), TRUE));
       $form['#build_id'] = $form_build_id;
       drupal_prepare_form($form_id, $form, $form_state);
@@ -154,8 +156,6 @@ function autoassignroleblocks_drupal_get_form($form_id, &$form) {
   if ((!empty($form_state['storage']) || !empty($form_state['rebuild'])) && !empty($form_state['process_input']) && !form_get_errors()) {
     $form = drupal_rebuild_form($form_id, $form_state, $args);
   }
-  // call our custom utility function to do some alterations on this form
-  $form = autoassignroleblocks_user_registration_formalterations($form, $args[1]);
   // set ID of form based on delta of block to avoid conflicts
   $form['form_id']['#id'] = $form['form_id']['#id'] . '_' . $args[2];
   return drupal_render_form($form_id, $form);
@@ -204,7 +204,7 @@ function autoassignroleblocks_block($op = 'list', $delta = 0, $edit = array()) {
         // extract the row to variables, we get $path, $registration, $display
         extract($row, EXTR_OVERWRITE);
         // tempoorarily change $_GET['q'] to the path of the autoassignrole_page we are working with
-        $_GET['q'] = ($registration == '1') ? $path : ($display == 1) ? 'user/' . $path : $path . '/register';
+        $_GET['q'] = $path;
         $block['content'] = autoassignroleblocks_drupal_get_form('user_register', $_GET['q'], $delta);
         // change $_GET['q'] back to it's original value
         $_GET['q'] = $get;
