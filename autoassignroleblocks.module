@@ -18,7 +18,7 @@ function autoassignroleblocks_init() {
 /**
  * Implementation of hook_form_FORM_ID_alter().
  * Add in additional block options into the autoassignrole settings page
- * 
+ *
  * @param $form
  *   Nested array of form elements that comprise the form.
  * @param $form_state
@@ -62,10 +62,10 @@ function autoassignroleblocks_form_autoassignrole_admin_form_alter(&$form, $form
  *   A valid form id.
  * @param $form_state
  *   A keyed array containing the current state of the form.
- * 
+ *
  * @return
  *   None.
- * 
+ *
  * @see autoassignroleblocks_form_autoassignrole_admin_form_alter().
  */
 function autoassignroleblocks_form_autoassignrole_admin_form_submit($form_id, &$form_state) {
@@ -117,7 +117,7 @@ function autoassignroleblocks_user_registration_formalterations($form, $path) {
  *
  * @return
  *   The rendered form.
- * 
+ *
  * @see drupal_get_form().
  */
 function autoassignroleblocks_drupal_get_form($form_id) {
@@ -197,6 +197,7 @@ function autoassignroleblocks_block($op = 'list', $delta = 0, $edit = array()) {
       break;
     case 'view':
       global $user;
+      $block = array();
       if ($user->uid == 0) { // only do this for anonymous users
         $get = $_GET['q']; // store the get variable so we can reset it later
         // get our data for this block from the database
